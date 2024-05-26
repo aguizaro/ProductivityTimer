@@ -9,6 +9,14 @@ class Dial {
     this.angle = 0;
     this.outerDialGraphics = this.outerDial();
     this.innerDialGraphics = this.innerDial();
+    this.innerFillPG = createGraphics(
+      this.innerRadius * 2 + 10,
+      this.innerRadius * 2 + 10
+    );
+    this.outerFillPG = createGraphics(
+      this.outerRadius * 2 + 10,
+      this.outerRadius * 2 + 10
+    );
   }
 
   outerDial() {
@@ -54,81 +62,54 @@ class Dial {
     return innerDialPG;
   }
 
-  innerFillAngle(angle) {
-    let innerFillPG = createGraphics(
-      this.innerRadius * 2 + 10,
-      this.innerRadius * 2 + 10
-    );
-
-    innerFillPG.fill(0, 10, 190, 120);
-
-    if (degrees(angle) % 360 <= 360 && degrees(angle) % 360 >= 358) {
-      //do something every minute
-    }
-
-    innerFillPG.noStroke();
-    innerFillPG.arc(
-      innerFillPG.width / 2,
-      innerFillPG.height / 2,
+  updateInnerFill(angle) {
+    this.innerFillPG.clear();
+    this.innerFillPG.fill(0, 10, 190, 120);
+    this.innerFillPG.noStroke();
+    this.innerFillPG.arc(
+      this.innerFillPG.width / 2,
+      this.innerFillPG.height / 2,
       this.innerRadius * 2,
       this.innerRadius * 2,
       -HALF_PI,
       -HALF_PI + angle
     );
-    return innerFillPG;
   }
 
-  outerFillAngle(angle) {
-    let outerFillPG = createGraphics(
-      this.outerRadius * 2 + 10,
-      this.outerRadius * 2 + 10
-    );
+  updateOuterFill(angle) {
+    this.outerFillPG.clear();
+    this.outerFillPG.fill(0, 100, 202, 120);
+    this.outerFillPG.noStroke();
+    this.outerFillPG.beginShape();
 
-    outerFillPG.fill(0, 100, 202, 120);
-    outerFillPG.noStroke();
-    outerFillPG.beginShape();
-
-    // Draw the outer arc
     for (let a = -HALF_PI; a <= -HALF_PI + angle; a += 0.01) {
-      let x = outerFillPG.width / 2 + this.outerRadius * cos(a);
-      let y = outerFillPG.height / 2 + this.outerRadius * sin(a);
-      outerFillPG.vertex(x, y);
+      let x = this.outerFillPG.width / 2 + this.outerRadius * cos(a);
+      let y = this.outerFillPG.height / 2 + this.outerRadius * sin(a);
+      this.outerFillPG.vertex(x, y);
     }
 
-    // Draw the inner arc in reverse
     for (let a = -HALF_PI + angle; a >= -HALF_PI; a -= 0.01) {
-      let x = outerFillPG.width / 2 + this.innerRadius * cos(a);
-      let y = outerFillPG.height / 2 + this.innerRadius * sin(a);
-      outerFillPG.vertex(x, y);
+      let x = this.outerFillPG.width / 2 + this.innerRadius * cos(a);
+      let y = this.outerFillPG.height / 2 + this.innerRadius * sin(a);
+      this.outerFillPG.vertex(x, y);
     }
 
-    outerFillPG.endShape(CLOSE);
-
-    return outerFillPG;
+    this.outerFillPG.endShape(CLOSE);
   }
 
   display(innerAngle = null, outerAngle = null) {
-    if (innerAngle) {
-      // If inner angle is provided, draw the fill
+    if (innerAngle !== null && outerAngle !== null) {
+      this.updateInnerFill(innerAngle);
+      this.updateOuterFill(outerAngle);
+
       push();
       translate(this.x, this.y);
       imageMode(CENTER);
-      let innerFillGraphics = this.innerFillAngle(innerAngle);
-      image(innerFillGraphics, 0, 0);
+      image(this.innerFillPG, 0, 0);
+      image(this.outerFillPG, 0, 0);
       pop();
     }
 
-    if (outerAngle) {
-      // If outer angle is provided, draw the fill
-      push();
-      translate(this.x, this.y);
-      imageMode(CENTER);
-      let outerFillGraphics = this.outerFillAngle(outerAngle);
-      image(outerFillGraphics, 0, 0);
-      pop();
-    }
-
-    // Draw the dial with rotation
     push();
     translate(this.x, this.y);
     rotate(-this.angle);

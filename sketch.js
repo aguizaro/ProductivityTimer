@@ -4,9 +4,14 @@
 // Global variables
 const MAX_TIME = 1000 * 60 * 60 * 12; // 12 hours
 
-// Objects
+// Timer
 let timer;
+let totalTime;
+
+// Dial
 let dial;
+
+// UI elements
 let pauseButton;
 let startButton;
 let resetButton;
@@ -26,7 +31,7 @@ let particles = [];
 let numParticles = 200;
 let dialX, dialY, dialOuterRadius, dialInnerRadius;
 
-// Open Simplex Noise
+// Perlin Noise
 let noiseScale = 0.01;
 let noiseOffset = 0;
 
@@ -35,8 +40,8 @@ let pauseColor, resumeColor, resetColor, startColor;
 
 // preload --------------------------------------------------------------------------------------
 function preload() {
-  digitalFont = loadFont("/digital-7-mono.ttf");
-  titleFont = loadFont("/Oldtimer.ttf");
+  digitalFont = loadFont(`./digital-7-mono.ttf`);
+  titleFont = loadFont(`./Oldtimer.ttf`);
 }
 
 // setup ---------------------------------------------------------------------------------------
@@ -46,7 +51,7 @@ function setup() {
   createCanvas(600, 700);
 
   pauseColor = color(17, 142, 214);
-  resumeColor = color(21, 115, 230);
+  resumeColor = color(0, 120, 120);
   resetColor = color(69, 0, 219);
   startColor = color(34, 128, 242);
 
@@ -61,6 +66,7 @@ function setup() {
 
   const data = localStorage.getItem("currentTimer");
   const dialValue = parseInt(localStorage.getItem("dialValue"));
+  const totalTimeValue = parseInt(localStorage.getItem("totalTime"));
 
   // create/load timer ---------------------------------
   timer = new Timer();
@@ -73,6 +79,10 @@ function setup() {
     if (dialValue) {
       timer.remainingTime = parseInt(dialValue);
     }
+  }
+
+  if (totalTimeValue) {
+    totalTime = totalTimeValue;
   }
 
   // create particles ---------------------
@@ -128,7 +138,7 @@ function draw() {
   //print all timer props
   if (timer.duration != 0 && !mouseDown) {
     let minuteAngle = map(timer.remainingTime, 0, 60000, 0, TWO_PI);
-    let totalAngle = map(timer.remainingTime, 0, timer.totalTime, 0, TWO_PI);
+    let totalAngle = map(timer.remainingTime, 0, totalTime, 0, TWO_PI);
     dial.display(minuteAngle, totalAngle);
   } else {
     dial.display();
@@ -175,14 +185,17 @@ function resumeTimer() {
 
 function resetTimer() {
   timer.resetTimer();
+  totalTime = 0;
   styleButton(pauseButton, pauseColor, true);
   styleButton(startButton, startColor, true);
   localStorage.removeItem("dialValue");
   localStorage.removeItem("currentTimer");
+  localStorage.removeItem("totalTime");
 }
 
 function startTimer() {
   timer.startTimer(timer.remainingTime / 1000, "Productivity Timer");
+  totalTime = timer.remainingTime;
   styleButton(startButton, startColor, true);
 
   pauseButton.html("Pause");
@@ -190,6 +203,7 @@ function startTimer() {
   styleButton(pauseButton, pauseColor);
 
   localStorage.removeItem("dialValue");
+  localStorage.setItem("totalTime", JSON.stringify(totalTime));
 }
 
 function styleButton(btn, col, disabled = false) {

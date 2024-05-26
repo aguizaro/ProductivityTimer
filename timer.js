@@ -7,7 +7,6 @@ class Timer {
     this.duration = 0;
     this.isRunning = false;
     this.remainingTime = 0;
-    this.totalTime = 0;
   }
 
   loadTimer(timerData) {
@@ -22,7 +21,6 @@ class Timer {
     this.name = timerName;
     this.startTime = Date.now();
     this.duration = seconds * 1000; // Convert to milliseconds
-    this.totalTime = this.duration;
     this.isRunning = true;
     this.remainingTime = this.duration;
 
@@ -49,7 +47,6 @@ class Timer {
     this.duration = 0;
     this.remainingTime = this.duration;
     this.name = "";
-    this.totalTime = 0;
     localStorage.setItem("currentTimer", JSON.stringify(this));
     localStorage.removeItem("dialValue");
   }
