@@ -4,6 +4,7 @@
 // Global variables
 const MAX_TIME = 1000 * 60 * 60 * 24; // 24 hours
 
+// Objects
 let timer;
 let dial;
 let pauseButton;
@@ -11,12 +12,23 @@ let startButton;
 let resetButton;
 let nameInput;
 
+// Fonts
 let digitalFont;
 let titleFont;
 
+// Mouse variables
 let previousMouseX, previousMouseY, previousTime;
 let mouseSpeed = 0;
 let mouseDown = false;
+
+// Particles
+let particles = [];
+let numParticles = 200;
+let dialX, dialY, dialOuterRadius, dialInnerRadius;
+
+// Open Simplex Noise
+let noiseScale = 0.01;
+let noiseOffset = 0;
 
 // preload --------------------------------------------------------------------------------------
 function preload() {
@@ -27,16 +39,22 @@ function preload() {
 // setup ---------------------------------------------------------------------------------------
 
 function setup() {
+  frameRate(60);
   createCanvas(600, 700);
-  background(255);
 
-  dial = new Dial();
+  dialX = width / 2;
+  dialY = height / 2;
+  dialOuterRadius = 200;
+  dialInnerRadius = 150;
+
+  dial = new Dial(dialX, dialY, dialInnerRadius, dialOuterRadius);
 
   // load local storage data -----------------------
 
   const data = localStorage.getItem("currentTimer");
   const dialValue = parseInt(localStorage.getItem("dialValue"));
 
+  // create/load timer ---------------------------------
   timer = new Timer();
   timer.name = "Productivity Timer";
 
@@ -47,6 +65,17 @@ function setup() {
     if (dialValue) {
       timer.remainingTime = parseInt(dialValue);
     }
+  }
+
+  // create particles ---------------------
+  for (let i = 0; i < numParticles; i++) {
+    let angle = random(TWO_PI);
+    let radius = random(dialInnerRadius, dialOuterRadius);
+    let x = dialX + radius * cos(angle);
+    let y = dialY + radius * sin(angle);
+    particles.push(
+      new Particle(x, y, dialX, dialY, dialInnerRadius, dialOuterRadius)
+    );
   }
 
   //create buttons ---------------------------------
@@ -89,10 +118,29 @@ function setup() {
 
 function draw() {
   background(255);
+  drawNoiseBackground();
   timer.update();
   timer.display();
-  //dial.update(timer.remainingTime, timer.duration);
   dial.display();
+
+  for (let particle of particles) {
+    particle.update(mouseSpeed);
+    particle.display();
+  }
+}
+
+// Open Simplex Noise -------------------------------------------------------------------------
+function drawNoiseBackground() {
+  for (let y = 0; y < height; y += 10) {
+    for (let x = 0; x < width; x += 10) {
+      let noiseValue = noise(x * noiseScale, y * noiseScale, noiseOffset);
+      let bright = map(noiseValue, 0, 1, 0, 255);
+      fill(50, bright, 171, 200);
+      noStroke();
+      rect(x, y, 10, 10);
+    }
+  }
+  noiseOffset += 0.01; // Adjust to control the speed of noise movement
 }
 
 // Button Functions --------------------------------------------------------------------------
@@ -173,138 +221,6 @@ function saveButtonStates() {
   localStorage.setItem("pauseButton", pauseButton.html());
 }
 
-// Timer class -------------------------------------------------------------------------------
-
-class Timer {
-  constructor() {
-    this.name = "";
-    this.startTime = 0;
-    this.duration = 0;
-    this.isRunning = false;
-    this.remainingTime = 0;
-  }
-
-  loadTimer(timerData) {
-    this.name = timerData.name;
-    this.startTime = timerData.startTime;
-    this.duration = timerData.duration;
-    this.isRunning = timerData.isRunning;
-    this.remainingTime = timerData.remainingTime;
-  }
-
-  startTimer(seconds, timerName = "untitled timer") {
-    this.name = timerName;
-    this.startTime = Date.now();
-    this.duration = seconds * 1000; // Convert to milliseconds
-    this.isRunning = true;
-    this.remainingTime = this.duration;
-  }
-
-  pauseTimer() {
-    this.isRunning = false;
-    localStorage.setItem("currentTimer", JSON.stringify(this));
-  }
-
-  resumeTimer() {
-    this.startTime = Date.now();
-    this.duration = this.remainingTime;
-    this.isRunning = true;
-    localStorage.setItem("currentTimer", JSON.stringify(this));
-  }
-
-  resetTimer() {
-    this.isRunning = false;
-    this.startTime = 0;
-    this.duration = 0;
-    this.remainingTime = this.duration;
-    localStorage.setItem("currentTimer", JSON.stringify(this));
-    localStorage.removeItem("dialValue");
-  }
-
-  update() {
-    if (this.isRunning) {
-      const elapsed = Date.now() - this.startTime;
-      this.remainingTime = this.duration - elapsed;
-      localStorage.setItem("currentTimer", JSON.stringify(this));
-      if (this.remainingTime <= 0) {
-        this.remainingTime = 0;
-        this.pauseTimer();
-      }
-    }
-  }
-
-  display() {
-    textFont(titleFont, 42);
-    textAlign(CENTER, CENTER);
-    text(this.name, width / 2, height / 10);
-
-    const hours = floor(this.remainingTime / 3600000);
-    const minutes = floor((this.remainingTime % 3600000) / 60000);
-    const seconds = floor((this.remainingTime % 60000) / 1000);
-
-    const paddedHours = this.padNumber(hours);
-    const paddedMinutes = this.padNumber(minutes);
-    const paddedSeconds = this.padNumber(seconds);
-
-    textFont(digitalFont, 72);
-    fill(105, 0, 150, 255);
-    textAlign(CENTER, CENTER);
-    text(
-      `${paddedHours}:${paddedMinutes}:${paddedSeconds}`,
-      width / 2,
-      height / 2
-    );
-  }
-
-  padNumber(number) {
-    return number < 10 ? "0" + number : number;
-  }
-}
-
-// Dial class --------------------------------------------------------------------------------
-
-class Dial {
-  constructor() {
-    this.x = width / 2;
-    this.y = height / 2;
-    this.diameter = 400;
-    this.angle = 0;
-    this.patternGraphics = this.createPattern();
-  }
-
-  createPattern() {
-    let pg = createGraphics(this.diameter * 1.5, this.diameter * 1.5);
-    pg.stroke(100, 100, 255);
-    pg.strokeWeight(20);
-    pg.fill(255, 100, 200, 15);
-    let numSegments = 24;
-    let angleStep = TWO_PI / numSegments;
-    for (let i = 0; i < numSegments; i++) {
-      if (i % 2 === 0) {
-        pg.arc(
-          pg.width / 2,
-          pg.height / 2,
-          this.diameter,
-          this.diameter,
-          i * angleStep,
-          (i + 1) * angleStep
-        );
-      }
-    }
-    return pg;
-  }
-
-  display() {
-    push();
-    translate(this.x, this.y);
-    rotate(0); // Start the dial at the top
-    rotate(-this.angle);
-    imageMode(CENTER);
-    image(this.patternGraphics, 0, 0);
-    pop();
-  }
-}
-
 // mouse interaction -------------------------------------------------------------------------
 function mouseDragged() {
   if (!mouseDown) return;
@@ -315,14 +231,14 @@ function mouseDragged() {
     let dx = mouseX - previousMouseX;
     let dy = mouseY - previousMouseY;
     let distance = sqrt(dx * dy + dy * dy);
-    if (isNaN(distance)) {
-      distance = 0;
-    }
     let currentTime = millis();
     let timeElapsed = currentTime - previousTime;
 
     // adjust input based on mouse speed
     mouseSpeed = distance / timeElapsed;
+    if (isNaN(mouseSpeed)) {
+      mouseSpeed = 0;
+    }
     let timeAdjustment = mouseSpeed * 60000;
     timeAdjustment = constrain(timeAdjustment, 0, 120000);
 
@@ -358,6 +274,7 @@ function mouseReleased() {
   }
   dial.angle = 0;
   mouseDown = false;
+  mouseSpeed = 0;
   previousMouseX = null;
   previousMouseY = null;
   previousTime = null;
