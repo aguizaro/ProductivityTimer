@@ -2,7 +2,7 @@
 // P5.js sketch that creates a productivity timer that counts down from a specified time
 
 // Global variables
-const MAX_TIME = 1000 * 60 * 60 * 24; // 24 hours
+const MAX_TIME = 1000 * 60 * 60 * 12; // 12 hours
 
 // Objects
 let timer;
@@ -30,6 +30,9 @@ let dialX, dialY, dialOuterRadius, dialInnerRadius;
 let noiseScale = 0.01;
 let noiseOffset = 0;
 
+//Button colors
+let pauseColor, resumeColor, resetColor, startColor;
+
 // preload --------------------------------------------------------------------------------------
 function preload() {
   digitalFont = loadFont("/digital-7-mono.ttf");
@@ -41,6 +44,11 @@ function preload() {
 function setup() {
   frameRate(60);
   createCanvas(600, 700);
+
+  pauseColor = color(17, 142, 214);
+  resumeColor = color(21, 115, 230);
+  resetColor = color(69, 0, 219);
+  startColor = color(34, 128, 242);
 
   dialX = width / 2;
   dialY = height / 2;
@@ -84,32 +92,29 @@ function setup() {
   if (timer.isRunning) {
     pauseButton = createButton("Pause");
     pauseButton.mousePressed(pauseTimer);
-    styleButton(pauseButton, "red");
+    styleButton(pauseButton, pauseColor);
   } else {
     pauseButton = createButton("Resume");
     pauseButton.mousePressed(resumeTimer);
-    styleButton(pauseButton, "green");
+    styleButton(pauseButton, resumeColor);
   }
   if (timer.remainingTime === 0) {
-    styleButton(pauseButton, "red", true);
+    styleButton(pauseButton, pauseColor, true);
   }
-  buttonDiv.child(pauseButton);
-
   resetButton = createButton("Reset");
   resetButton.mousePressed(resetTimer);
-  styleButton(resetButton, "orange");
+  styleButton(resetButton, resetColor);
 
   startButton = createButton("Start");
   startButton.mousePressed(startTimer);
+  styleButton(startButton, startColor, true);
 
-  if (timer.remainingTime === 0) {
-    styleButton(startButton, "blue", true);
-  } else {
-    styleButton(startButton, "blue");
-
+  if (dialValue > 0 && !timer.isRunning) {
     pauseButton.html("Pause");
-    styleButton(pauseButton, "red", true);
+    styleButton(pauseButton, pauseColor, true);
+    styleButton(startButton, startColor);
   }
+  buttonDiv.child(pauseButton);
   buttonDiv.child(resetButton);
   buttonDiv.child(startButton);
 }
@@ -119,9 +124,18 @@ function setup() {
 function draw() {
   background(255);
   drawNoiseBackground();
+
+  //print all timer props
+  if (timer.duration != 0 && !mouseDown) {
+    let minuteAngle = map(timer.remainingTime, 0, 60000, 0, TWO_PI);
+    let totalAngle = map(timer.remainingTime, 0, timer.totalTime, 0, TWO_PI);
+    dial.display(minuteAngle, totalAngle);
+  } else {
+    dial.display();
+  }
+
   timer.update();
   timer.display();
-  dial.display();
 
   for (let particle of particles) {
     particle.update(mouseSpeed);
@@ -149,31 +163,31 @@ function pauseTimer() {
   timer.pauseTimer();
   pauseButton.html("Resume");
   pauseButton.mousePressed(resumeTimer);
-  styleButton(pauseButton, "green");
+  styleButton(pauseButton, resumeColor);
 }
 
 function resumeTimer() {
   timer.resumeTimer();
   pauseButton.html("Pause");
   pauseButton.mousePressed(pauseTimer);
-  styleButton(pauseButton, "red");
+  styleButton(pauseButton, pauseColor);
 }
 
 function resetTimer() {
   timer.resetTimer();
-  styleButton(pauseButton, "red", true);
-  styleButton(startButton, "blue", true);
+  styleButton(pauseButton, pauseColor, true);
+  styleButton(startButton, startColor, true);
   localStorage.removeItem("dialValue");
   localStorage.removeItem("currentTimer");
 }
 
 function startTimer() {
-  timer.resumeTimer();
-  styleButton(startButton, "blue", true);
+  timer.startTimer(timer.remainingTime / 1000, "Productivity Timer");
+  styleButton(startButton, startColor, true);
 
   pauseButton.html("Pause");
   pauseButton.mousePressed(pauseTimer);
-  styleButton(pauseButton, "red");
+  styleButton(pauseButton, pauseColor);
 
   localStorage.removeItem("dialValue");
 }
@@ -252,7 +266,7 @@ function mouseDragged() {
     timer.remainingTime = constrain(timer.remainingTime, 0, MAX_TIME);
     if (timer.remainingTime > 0) {
       localStorage.setItem("dialValue", timer.remainingTime);
-      styleButton(startButton, "blue");
+      styleButton(startButton, startColor);
     }
 
     dial.angle = angle;
@@ -268,10 +282,10 @@ function mouseReleased() {
   //round to nearest 30 seconds
   timer.remainingTime = Math.round(timer.remainingTime / 30000) * 30000;
   if (timer.remainingTime === 0) {
-    styleButton(startButton, "blue", true);
-  } else {
-    localStorage.setItem("dialValue", timer.remainingTime);
+    styleButton(startButton, startColor, true);
   }
+
+  localStorage.setItem("dialValue", timer.remainingTime);
   dial.angle = 0;
   mouseDown = false;
   mouseSpeed = 0;
@@ -286,7 +300,8 @@ function mousePressed() {
     mouseX < width &&
     mouseY > 0 &&
     mouseY < height &&
-    !timer.isRunning;
+    !timer.isRunning &&
+    timer.duration == 0;
 
   if (mouseX > 0 && mouseX < width) {
     if (mouseY > 0 && mouseY < height / 8 + 50) {

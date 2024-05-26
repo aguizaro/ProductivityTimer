@@ -7,7 +7,7 @@ class Particle {
     this.dialY = dialY;
     this.dialInnerRadius = dialInnerRadius;
     this.dialOuterRadius = dialOuterRadius;
-    this.color = color(189, 255, 252, random(50, 255));
+    this.color = color(random(0, 100), 0, random(100, 210), random(100, 255));
   }
 
   update(speed) {
@@ -63,7 +63,7 @@ class Particle {
     push();
     fill(this.color);
     noStroke();
-    ellipse(this.position.x, this.position.y, 5, 5);
+    ellipse(this.position.x, this.position.y, 6, 6);
     pop();
   }
 }

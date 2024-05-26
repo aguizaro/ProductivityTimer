@@ -7,6 +7,7 @@ class Timer {
     this.duration = 0;
     this.isRunning = false;
     this.remainingTime = 0;
+    this.totalTime = 0;
   }
 
   loadTimer(timerData) {
@@ -17,12 +18,17 @@ class Timer {
     this.remainingTime = timerData.remainingTime;
   }
 
-  startTimer(seconds, timerName = "untitled timer") {
+  startTimer(seconds, timerName) {
     this.name = timerName;
     this.startTime = Date.now();
     this.duration = seconds * 1000; // Convert to milliseconds
+    this.totalTime = this.duration;
     this.isRunning = true;
     this.remainingTime = this.duration;
+
+    console.log(
+      `Timer started: ${this.name} for ${seconds} seconds\nstartTime: ${this.startTime}\nduration: ${this.duration}\nremainingTime: ${this.remainingTime}`
+    );
   }
 
   pauseTimer() {
@@ -42,6 +48,8 @@ class Timer {
     this.startTime = 0;
     this.duration = 0;
     this.remainingTime = this.duration;
+    this.name = "";
+    this.totalTime = 0;
     localStorage.setItem("currentTimer", JSON.stringify(this));
     localStorage.removeItem("dialValue");
   }
@@ -73,7 +81,7 @@ class Timer {
     const paddedSeconds = this.padNumber(seconds);
 
     textFont(digitalFont, 72);
-    fill(189, 255, 242);
+    fill(189, 255, 242, 255);
     textAlign(CENTER, CENTER);
     text(
       `${paddedHours}:${paddedMinutes}:${paddedSeconds}`,
