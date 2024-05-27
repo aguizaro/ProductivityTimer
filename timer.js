@@ -30,6 +30,14 @@ class Timer {
     localStorage.setItem("currentTimer", JSON.stringify(this));
   }
 
+  stopTimer() {
+    this.isRunning = false;
+    this.remainingTime = 0;
+    styleButton(pauseButton, pauseColor, true);
+    styleButton(startButton, startColor, true);
+    localStorage.setItem("currentTimer", JSON.stringify(this));
+  }
+
   resumeTimer() {
     this.startTime = Date.now();
     this.duration = this.remainingTime;
@@ -52,8 +60,7 @@ class Timer {
       this.remainingTime = this.duration - elapsed;
       localStorage.setItem("currentTimer", JSON.stringify(this));
       if (this.remainingTime <= 0) {
-        this.remainingTime = 0;
-        this.pauseTimer();
+        this.stopTimer();
       }
     }
   }

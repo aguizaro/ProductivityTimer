@@ -32,6 +32,8 @@ body {
   min-height: 100vh;
 }
 
+/* Updates ---------------------------------------- */
+
 .buttonDiv {
   display: flex;
   justify-content: center;
@@ -41,6 +43,13 @@ body {
 .buttonDiv button {
   width: 6em;
 }
+
+.mainCanvas {
+  width: 95vw !important;
+}
+
+
+/* ----------------------------------------------- */
 
 h1 {
   font-size: 3.2em;

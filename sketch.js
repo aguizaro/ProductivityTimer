@@ -31,7 +31,7 @@ let mouseDown = false;
 
 // Particles
 let particles = [];
-let numParticles = 1000;
+let numParticles = 1500;
 let dialX, dialY, dialOuterRadius, dialInnerRadius;
 
 // Perlin Noise
@@ -54,7 +54,8 @@ function preload() {
 
 function setup() {
   frameRate(60);
-  createCanvas(600, 720);
+  canvasWidth = Math.floor(windowWidth / 100) * 100;
+  createCanvas(canvasWidth, 720);
   buffer = createGraphics(width / 4, height / 4); // Create a smaller off-screen buffer
   buffer.pixelDensity(1); // Ensure the pixel density of the buffer is set to 1 for accurate scaling
 
@@ -131,12 +132,52 @@ function setup() {
   buttonDiv.child(pauseButton);
   buttonDiv.child(resetButton);
   buttonDiv.child(startButton);
+
+  getCurrentSunlight().then((color) => {
+    console.log(color);
+  });
+}
+
+// user properties --------------------------------------------------------------------------------
+
+async function getCurrentSunlight() {
+  let lat, lon, sunrise, sunset;
+  if (navigator.geolocation) {
+    navigator.geolocation.getCurrentPosition((position) => {
+      lat = position.coords.latitude;
+      lon = position.coords.longitude;
+    });
+  } else {
+    console.log("Geolocation is not supported by this browser.");
+  }
+
+  let url = `https://api.sunrise-sunset.org/json?lat=${lat}&lng=${lon}&formatted=0`;
+
+  const data = await fetch(url);
+  const json = await data.json();
+  sunrise = new Date(json.results.sunrise);
+  sunset = new Date(json.results.sunset);
+
+  let now = new Date();
+  let currentTime = now.getTime();
+  let sunriseTime = sunrise.getTime();
+  let sunsetTime = sunset.getTime();
+
+  return `Sunrise: ${sunriseTime}, Sunset: ${sunsetTime}, Current: ${currentTime}`;
 }
 
 // update loop --------------------------------------------------------------------------------
 
 function draw() {
+  resizeCanvas(Math.floor(windowWidth / 100) * 100, 720);
+
+  //update dial
+  dial.x = width / 2;
+  dial.y = height / 2 + 25;
+
   background(255);
+
+  //display perlin noise background
   drawNoiseBackground();
   image(buffer, 0, 0, width, height);
 
@@ -152,23 +193,46 @@ function draw() {
   timer.display(hoveringOverTitle, hoveringOverDial);
 
   for (let particle of particles) {
-    particle.display(mouseSpeed);
+    particle.dialX = dial.x;
+    particle.dialY = dial.y;
+    particle.updatePosition();
+    particle.display(mouseSpeed, timer.isRunning);
   }
 
-  if (!isDialMoving && hoveringOverDial) {
-    push();
-    fill(189, 255, 242, 255);
-    textAlign(CENTER, CENTER);
-    textSize(24);
-    text("click and drag to set timer", dial.x, dial.y + dial.outerRadius + 30);
-    pop();
+  if (hoveringOverDial) {
+    if (!isDialMoving && timer.remainingTime != 0) {
+      push();
+      fill(189, 255, 242, 255);
+      textAlign(CENTER, CENTER);
+      textFont(titleFont, 16);
+      fill(255);
+      text(
+        "click and drag to set timer",
+        dial.x,
+        dial.y + dial.outerRadius + 30
+      );
+      pop();
+    } else {
+      push();
+      fill(189, 255, 242, 255);
+      textAlign(CENTER, CENTER);
+      textFont(titleFont, 16);
+      fill(255);
+      text(
+        "press reset button to set a new timer",
+        dial.x,
+        dial.y + dial.outerRadius + 30
+      );
+      pop();
+    }
   }
 
   if (hoveringOverTitle) {
     push();
     fill(189, 255, 242, 255);
     textAlign(CENTER, CENTER);
-    textSize(24);
+    textFont(titleFont, 16);
+    fill(255);
     text("click to edit timer name", width / 2, height / 11 + 50);
     pop();
   }
@@ -203,7 +267,7 @@ function drawNoiseBackground() {
   buffer.updatePixels();
 
   // speed up rotation when timer is running
-  angleSpeed = timer.isRunning ? BASE_ANGLE_SPEED * 5 : BASE_ANGLE_SPEED;
+  angleSpeed = timer.isRunning ? BASE_ANGLE_SPEED * 4 : BASE_ANGLE_SPEED;
   angleOffset += angleSpeed;
 }
 
@@ -305,11 +369,14 @@ function mouseDragged() {
     timeAdjustment = constrain(timeAdjustment, 0, 120000);
 
     // determine direction - clockwise or counterclockwise
+    let rotationDirection = 0;
     if (angle < dial.angle) {
       timer.remainingTime += timeAdjustment;
+      rotationDirection = 1;
       //angleSpeed = -BASE_ANGLE_SPEED * 8;
     } else if (angle > dial.angle) {
       timer.remainingTime -= timeAdjustment;
+      rotationDirection = -1;
       //angleSpeed = BASE_ANGLE_SPEED * 8;
     }
 
@@ -318,7 +385,12 @@ function mouseDragged() {
       styleButton(startButton, startColor);
     }
 
-    dial.angle = angle;
+    if (rotationDirection != 0) {
+      dial.angle = angle;
+      for (let particle of particles) {
+        particle.influenceDirection(rotationDirection * mouseSpeed);
+      }
+    }
   }
   previousMouseX = mouseX;
   previousMouseY = mouseY;
@@ -330,8 +402,8 @@ function mouseReleased() {
   isDialMoving = false;
   angleSpeed = BASE_ANGLE_SPEED;
 
-  //round to nearest 30 seconds
-  timer.remainingTime = Math.round(timer.remainingTime / 30000) * 30000;
+  //round to nearest 15 seconds
+  timer.remainingTime = Math.round(timer.remainingTime / 15000) * 15000;
   if (timer.remainingTime === 0) {
     styleButton(startButton, startColor, true);
   }
@@ -372,6 +444,12 @@ function mousePressed() {
     !timer.isRunning &&
     timer.duration == 0;
 
+  if (mouseDown) {
+    // for (let particle of particles) {
+    //   particle.velocity.mult(0);
+    // }
+  }
+
   // initial mouse position and time
   previousMouseX = mouseX;
   previousMouseY = mouseY;
@@ -406,8 +484,7 @@ function checkHover() {
     mouseX < width &&
     mouseY > height / 7 + 10 &&
     mouseY < height - 25 &&
-    !timer.isRunning &&
-    timer.duration == 0
+    !timer.isRunning
   ) {
     hoveringOverDial = true;
   } else {
