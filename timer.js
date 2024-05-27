@@ -23,10 +23,6 @@ class Timer {
     this.duration = seconds * 1000; // Convert to milliseconds
     this.isRunning = true;
     this.remainingTime = this.duration;
-
-    console.log(
-      `Timer started: ${this.name} for ${seconds} seconds\nstartTime: ${this.startTime}\nduration: ${this.duration}\nremainingTime: ${this.remainingTime}`
-    );
   }
 
   pauseTimer() {
@@ -46,9 +42,8 @@ class Timer {
     this.startTime = 0;
     this.duration = 0;
     this.remainingTime = this.duration;
-    this.name = "";
+    this.name = "Untitled Timer";
     localStorage.setItem("currentTimer", JSON.stringify(this));
-    localStorage.removeItem("dialValue");
   }
 
   update() {
@@ -63,11 +58,15 @@ class Timer {
     }
   }
 
-  display() {
+  display(nameHover = false) {
+    this.update();
     textFont(titleFont, 42);
     fill(189, 255, 242);
+    if (nameHover) {
+      fill(0, 237, 255);
+    }
     textAlign(CENTER, CENTER);
-    text(this.name, width / 2, height / 10);
+    text(this.name, width / 2, height / 11);
 
     const hours = floor(this.remainingTime / 3600000);
     const minutes = floor((this.remainingTime % 3600000) / 60000);

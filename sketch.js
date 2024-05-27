@@ -7,9 +7,12 @@ const MAX_TIME = 1000 * 60 * 60 * 12; // 12 hours
 // Timer
 let timer;
 let totalTime;
+let hoveringOverTitle = false;
 
 // Dial
 let dial;
+let hoveringOverDial = false;
+let isDialMoving = false;
 
 // UI elements
 let pauseButton;
@@ -65,22 +68,18 @@ function setup() {
   // load local storage data -----------------------
 
   const data = localStorage.getItem("currentTimer");
-  const dialValue = parseInt(localStorage.getItem("dialValue"));
   const totalTimeValue = parseInt(localStorage.getItem("totalTime"));
 
-  // create/load timer ---------------------------------
   timer = new Timer();
-  timer.name = "Productivity Timer";
+  timer.name = "Untitled Timer";
+
+  // set local storage data -------------------------
 
   if (data) {
+    // load saved timer
     const timerData = JSON.parse(data);
     timer.loadTimer(timerData);
-  } else {
-    if (dialValue) {
-      timer.remainingTime = parseInt(dialValue);
-    }
   }
-
   if (totalTimeValue) {
     totalTime = totalTimeValue;
   }
@@ -119,7 +118,7 @@ function setup() {
   startButton.mousePressed(startTimer);
   styleButton(startButton, startColor, true);
 
-  if (dialValue > 0 && !timer.isRunning) {
+  if (timer.remainingTime > 0 && !timer.isRunning && timer.startTime === 0) {
     pauseButton.html("Pause");
     styleButton(pauseButton, pauseColor, true);
     styleButton(startButton, startColor);
@@ -139,17 +138,33 @@ function draw() {
   if (timer.duration != 0 && !mouseDown) {
     let minuteAngle = map(timer.remainingTime, 0, 60000, 0, TWO_PI);
     let totalAngle = map(timer.remainingTime, 0, totalTime, 0, TWO_PI);
-    dial.display(minuteAngle, totalAngle);
+    dial.display(hoveringOverDial, minuteAngle, totalAngle);
   } else {
-    dial.display();
+    dial.display(hoveringOverDial);
   }
 
-  timer.update();
-  timer.display();
+  timer.display(hoveringOverTitle);
 
   for (let particle of particles) {
-    particle.update(mouseSpeed);
-    particle.display();
+    particle.display(mouseSpeed);
+  }
+
+  if (!isDialMoving && hoveringOverDial) {
+    push();
+    fill(189, 255, 242, 255);
+    textAlign(CENTER, CENTER);
+    textSize(24);
+    text("click and drag to set timer", dial.x, dial.y + dial.outerRadius + 30);
+    pop();
+  }
+
+  if (hoveringOverTitle) {
+    push();
+    fill(189, 255, 242, 255);
+    textAlign(CENTER, CENTER);
+    textSize(24);
+    text("click to edit timer name", width / 2, height / 11 + 50);
+    pop();
   }
 }
 
@@ -188,22 +203,19 @@ function resetTimer() {
   totalTime = 0;
   styleButton(pauseButton, pauseColor, true);
   styleButton(startButton, startColor, true);
-  localStorage.removeItem("dialValue");
   localStorage.removeItem("currentTimer");
   localStorage.removeItem("totalTime");
 }
 
 function startTimer() {
-  timer.startTimer(timer.remainingTime / 1000, "Productivity Timer");
+  timer.startTimer(timer.remainingTime / 1000, timer.name);
   totalTime = timer.remainingTime;
   styleButton(startButton, startColor, true);
 
   pauseButton.html("Pause");
   pauseButton.mousePressed(pauseTimer);
   styleButton(pauseButton, pauseColor);
-
-  localStorage.removeItem("dialValue");
-  localStorage.setItem("totalTime", JSON.stringify(totalTime));
+  localStorage.setItem("totalTime", totalTime);
 }
 
 function styleButton(btn, col, disabled = false) {
@@ -245,13 +257,10 @@ function decreaseAlpha(col, amount) {
   return color(r, g, b, a);
 }
 
-function saveButtonStates() {
-  localStorage.setItem("pauseButton", pauseButton.html());
-}
-
 // mouse interaction -------------------------------------------------------------------------
 function mouseDragged() {
   if (!mouseDown) return;
+  isDialMoving = true;
 
   let angle = -atan2(mouseY - dial.y, mouseX - dial.x);
 
@@ -279,7 +288,6 @@ function mouseDragged() {
 
     timer.remainingTime = constrain(timer.remainingTime, 0, MAX_TIME);
     if (timer.remainingTime > 0) {
-      localStorage.setItem("dialValue", timer.remainingTime);
       styleButton(startButton, startColor);
     }
 
@@ -292,6 +300,7 @@ function mouseDragged() {
 
 function mouseReleased() {
   if (!mouseDown) return;
+  isDialMoving = false;
 
   //round to nearest 30 seconds
   timer.remainingTime = Math.round(timer.remainingTime / 30000) * 30000;
@@ -299,7 +308,7 @@ function mouseReleased() {
     styleButton(startButton, startColor, true);
   }
 
-  localStorage.setItem("dialValue", timer.remainingTime);
+  localStorage.setItem("currentTimer", JSON.stringify(timer));
   dial.angle = 0;
   mouseDown = false;
   mouseSpeed = 0;
@@ -309,24 +318,78 @@ function mouseReleased() {
 }
 
 function mousePressed() {
-  mouseDown =
+  if (
     mouseX > 0 &&
     mouseX < width &&
     mouseY > 0 &&
-    mouseY < height &&
+    mouseY < height / 7 + 10 &&
+    timer.startTime == 0
+  ) {
+    const inputName = prompt("Enter timer name", timer.name);
+    if (inputName != null && inputName != "") {
+      timer.name = inputName;
+    } else {
+      timer.name = "Untitled Timer";
+    }
+    localStorage.setItem("currentTimer", JSON.stringify(timer));
+    return;
+  }
+
+  mouseDown =
+    mouseX > 0 &&
+    mouseX < width &&
+    mouseY > height / 7 + 10 &&
+    mouseY < (6 * height) / 7 &&
     !timer.isRunning &&
     timer.duration == 0;
-
-  if (mouseX > 0 && mouseX < width) {
-    if (mouseY > 0 && mouseY < height / 8 + 50) {
-      console.log("clicked on title");
-    } else {
-      //hide input box
-    }
-  }
 
   // initial mouse position and time
   previousMouseX = mouseX;
   previousMouseY = mouseY;
   previousTime = millis();
 }
+
+//mouse hover --------------------------------------------------------------------------------
+function mouseMoved() {
+  //check if hovering over title
+  if (
+    mouseX > 0 &&
+    mouseX < width &&
+    mouseY > 0 &&
+    mouseY < height / 7 + 10 &&
+    timer.startTime == 0
+  ) {
+    hoveringOverTitle = true;
+    hoveringOverDial = false;
+    return;
+  } else {
+    hoveringOverTitle = false;
+  }
+
+  if (dial == null) return; // dial not initialized yet
+
+  if (
+    mouseX > 0 &&
+    mouseX < width &&
+    mouseY > height / 7 + 10 &&
+    mouseY < (6 * height) / 7 &&
+    !timer.isRunning &&
+    timer.duration == 0
+  ) {
+    hoveringOverDial = true;
+  } else {
+    hoveringOverDial = false;
+  }
+}
+
+//window focus --------------------------------------------------------------------------------
+window.onfocus = function () {
+  mouseDown = false;
+  hoveringOverDial = false;
+  hoveringOverTitle = false;
+};
+window.onblur = function () {
+  mouseDown = false;
+  hoveringOverDial = false;
+  hoveringOverTitle = false;
+};

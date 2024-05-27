@@ -7,8 +7,14 @@ class Dial {
     this.innerRadius = innerRadius;
     this.outerRadius = outerRadius;
     this.angle = 0;
-    this.outerDialGraphics = this.outerDial();
-    this.innerDialGraphics = this.innerDial();
+    this.outerDialPG = createGraphics(
+      this.outerRadius * 2 + 10,
+      this.outerRadius * 2 + 10
+    );
+    this.innerDialPG = createGraphics(
+      this.outerRadius * 2 + 10,
+      this.outerRadius * 2 + 10
+    );
     this.innerFillPG = createGraphics(
       this.innerRadius * 2 + 10,
       this.innerRadius * 2 + 10
@@ -19,38 +25,37 @@ class Dial {
     );
   }
 
-  outerDial() {
-    let outerDialPG = createGraphics(
-      this.outerRadius * 2 + 10,
-      this.outerRadius * 2 + 10
-    );
-    outerDialPG.stroke(189, 255, 242, 255);
-    outerDialPG.strokeWeight(5);
-    outerDialPG.noFill();
-    outerDialPG.ellipse(
-      outerDialPG.width / 2,
-      outerDialPG.height / 2,
+  updateOuterDial(dialHover = false) {
+    push();
+    this.outerDialPG.stroke(189, 255, 242, 255);
+    if (dialHover) {
+      this.outerDialPG.stroke(0, 237, 255);
+    }
+    this.outerDialPG.strokeWeight(5);
+    this.outerDialPG.noFill();
+    this.outerDialPG.ellipse(
+      this.outerDialPG.width / 2,
+      this.outerDialPG.height / 2,
       this.outerRadius * 2
     );
-    return outerDialPG;
+    pop();
   }
 
-  innerDial() {
-    let innerDialPG = createGraphics(
-      this.innerRadius * 2 + 10,
-      this.innerRadius * 2 + 10
-    );
+  updateInnerDial(dialHover = false) {
     push();
-    innerDialPG.stroke(189, 255, 242, 255);
-    innerDialPG.strokeWeight(5);
-    innerDialPG.noFill();
-    let numSegments = 180;
+    this.innerDialPG.stroke(189, 255, 242, 255);
+    if (dialHover) {
+      this.innerDialPG.stroke(0, 237, 255);
+    }
+    this.innerDialPG.strokeWeight(5);
+    this.innerDialPG.noFill();
+    let numSegments = 120;
     let angleStep = TWO_PI / numSegments;
     for (let i = 0; i < numSegments; i++) {
       if (i % 2 === 0) {
-        innerDialPG.arc(
-          innerDialPG.width / 2,
-          innerDialPG.height / 2,
+        this.innerDialPG.arc(
+          this.innerDialPG.width / 2,
+          this.innerDialPG.height / 2,
           this.innerRadius * 2,
           this.innerRadius * 2,
           i * angleStep,
@@ -59,7 +64,6 @@ class Dial {
       }
     }
     pop();
-    return innerDialPG;
   }
 
   updateInnerFill(angle) {
@@ -97,7 +101,7 @@ class Dial {
     this.outerFillPG.endShape(CLOSE);
   }
 
-  display(innerAngle = null, outerAngle = null) {
+  display(dialHover = false, innerAngle = null, outerAngle = null) {
     if (innerAngle !== null && outerAngle !== null) {
       this.updateInnerFill(innerAngle);
       this.updateOuterFill(outerAngle);
@@ -114,8 +118,11 @@ class Dial {
     translate(this.x, this.y);
     rotate(-this.angle);
     imageMode(CENTER);
-    image(this.innerDialGraphics, 0, 0);
-    image(this.outerDialGraphics, 0, 0);
+    this.updateInnerDial(dialHover);
+    this.updateOuterDial(dialHover);
+    image(this.innerDialPG, 0, 0);
+    image(this.outerDialPG, 0, 0);
+
     pop();
   }
 }

@@ -59,7 +59,8 @@ class Particle {
       this.velocity.mult(-1); // Reverse the direction of velocity
     }
   }
-  display() {
+  display(speed) {
+    this.update(speed);
     push();
     fill(this.color);
     noStroke();
