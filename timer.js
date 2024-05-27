@@ -61,6 +61,7 @@ class Timer {
       localStorage.setItem("currentTimer", JSON.stringify(this));
       if (this.remainingTime <= 0) {
         this.stopTimer();
+        timerDone = true;
       }
     }
   }

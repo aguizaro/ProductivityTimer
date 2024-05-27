@@ -8,6 +8,7 @@ const MAX_TIME = 1000 * 60 * 60 * 12; // 12 hours
 let timer;
 let totalTime;
 let hoveringOverTitle = false;
+let timerDone = false;
 
 // Dial
 let dial;
@@ -200,19 +201,7 @@ function draw() {
   }
 
   if (hoveringOverDial) {
-    if (!isDialMoving && timer.remainingTime != 0) {
-      push();
-      fill(189, 255, 242, 255);
-      textAlign(CENTER, CENTER);
-      textFont(titleFont, 16);
-      fill(255);
-      text(
-        "click and drag to set timer",
-        dial.x,
-        dial.y + dial.outerRadius + 30
-      );
-      pop();
-    } else {
+    if (timerDone) {
       push();
       fill(189, 255, 242, 255);
       textAlign(CENTER, CENTER);
@@ -220,6 +209,18 @@ function draw() {
       fill(255);
       text(
         "press reset button to set a new timer",
+        dial.x,
+        dial.y + dial.outerRadius + 30
+      );
+      pop();
+    } else if (!isDialMoving) {
+      push();
+      fill(189, 255, 242, 255);
+      textAlign(CENTER, CENTER);
+      textFont(titleFont, 16);
+      fill(255);
+      text(
+        "click and drag to set timer",
         dial.x,
         dial.y + dial.outerRadius + 30
       );
@@ -290,6 +291,7 @@ function resumeTimer() {
 function resetTimer() {
   timer.resetTimer();
   totalTime = 0;
+  timerDone = false;
   styleButton(pauseButton, pauseColor, true);
   styleButton(startButton, startColor, true);
   localStorage.removeItem("currentTimer");
