@@ -58,7 +58,7 @@ class Timer {
     }
   }
 
-  display(nameHover = false) {
+  display(nameHover = false, dialHover = false) {
     this.update();
     textFont(titleFont, 42);
     fill(189, 255, 242);
@@ -78,11 +78,14 @@ class Timer {
 
     textFont(digitalFont, 72);
     fill(189, 255, 242, 255);
+    if (dialHover) {
+      fill(0, 237, 255);
+    }
     textAlign(CENTER, CENTER);
     text(
       `${paddedHours}:${paddedMinutes}:${paddedSeconds}`,
       width / 2,
-      height / 2
+      height / 2 + 25
     );
   }
 

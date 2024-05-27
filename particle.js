@@ -7,10 +7,14 @@ class Particle {
     this.dialY = dialY;
     this.dialInnerRadius = dialInnerRadius;
     this.dialOuterRadius = dialOuterRadius;
-    this.color = color(random(0, 100), 0, random(100, 210), random(100, 255));
+    this.color = color(random(0, 100), 0, random(100, 210), random(50, 255));
+    this.size = random(4, 8);
   }
 
   update(speed) {
+    if (isNaN(speed)) {
+      speed = 0;
+    }
     // random walk behavior
     let randomStep = p5.Vector.random2D();
     randomStep.mult(0.01);
@@ -22,7 +26,7 @@ class Particle {
     this.velocity.add(this.acceleration);
 
     this.velocity.mult(0.98); // deccelerate the particle over time
-    this.velocity.limit(5); // maximum speed
+    this.velocity.limit(4); // maximum speed
 
     this.position.add(this.velocity);
     this.acceleration.mult(0); // clear acceleration
@@ -57,14 +61,17 @@ class Particle {
 
       // Reverse the direction (bounce back)
       this.velocity.mult(-1); // Reverse the direction of velocity
+      this.color = color(random(0, 100), 0, random(100, 210), random(50, 255));
+      this.size = random(4, 8);
     }
   }
   display(speed) {
-    this.update(speed);
+    this.update(speed * 20);
     push();
     fill(this.color);
     noStroke();
-    ellipse(this.position.x, this.position.y, 6, 6);
+
+    ellipse(this.position.x, this.position.y, this.size, this.size);
     pop();
   }
 }

@@ -31,13 +31,16 @@ let mouseDown = false;
 
 // Particles
 let particles = [];
-let numParticles = 200;
+let numParticles = 1000;
 let dialX, dialY, dialOuterRadius, dialInnerRadius;
 
 // Perlin Noise
-let noiseScale = 0.01;
+let buffer;
+let noiseScale = 0.1; //density of noise
 let noiseOffset = 0;
-
+let angleOffset = 0;
+const BASE_ANGLE_SPEED = 0.0003; // speed of noise rotation
+let angleSpeed = BASE_ANGLE_SPEED;
 //Button colors
 let pauseColor, resumeColor, resetColor, startColor;
 
@@ -51,7 +54,9 @@ function preload() {
 
 function setup() {
   frameRate(60);
-  createCanvas(600, 700);
+  createCanvas(600, 720);
+  buffer = createGraphics(width / 4, height / 4); // Create a smaller off-screen buffer
+  buffer.pixelDensity(1); // Ensure the pixel density of the buffer is set to 1 for accurate scaling
 
   pauseColor = color(17, 142, 214);
   resumeColor = color(0, 120, 120);
@@ -59,8 +64,8 @@ function setup() {
   startColor = color(34, 128, 242);
 
   dialX = width / 2;
-  dialY = height / 2;
-  dialOuterRadius = 200;
+  dialY = height / 2 + 25;
+  dialOuterRadius = 225;
   dialInnerRadius = 150;
 
   dial = new Dial(dialX, dialY, dialInnerRadius, dialOuterRadius);
@@ -133,6 +138,7 @@ function setup() {
 function draw() {
   background(255);
   drawNoiseBackground();
+  image(buffer, 0, 0, width, height);
 
   //print all timer props
   if (timer.duration != 0 && !mouseDown) {
@@ -143,7 +149,7 @@ function draw() {
     dial.display(hoveringOverDial);
   }
 
-  timer.display(hoveringOverTitle);
+  timer.display(hoveringOverTitle, hoveringOverDial);
 
   for (let particle of particles) {
     particle.display(mouseSpeed);
@@ -168,18 +174,37 @@ function draw() {
   }
 }
 
-// Open Simplex Noise -------------------------------------------------------------------------
+// Perlin Noise -------------------------------------------------------------------------
+
 function drawNoiseBackground() {
-  for (let y = 0; y < height; y += 10) {
-    for (let x = 0; x < width; x += 10) {
-      let noiseValue = noise(x * noiseScale, y * noiseScale, noiseOffset);
+  buffer.loadPixels();
+  for (let y = 0; y < buffer.height; y++) {
+    for (let x = 0; x < buffer.width; x++) {
+      let angle =
+        atan2(y - buffer.height / 2, x - buffer.width / 2) + angleOffset;
+      let radius = dist(x, y, buffer.width / 2, buffer.height / 2);
+
+      // noise value based on the angle and radius
+      let noiseValue = noise(
+        cos(angle) * radius * noiseScale,
+        sin(angle) * radius * noiseScale
+      );
       let bright = map(noiseValue, 0, 1, 0, 255);
-      fill(50, bright, 171, 200);
-      noStroke();
-      rect(x, y, 10, 10);
+
+      // flat buffer index = ((x + y * bufferWidth) * 4) ---> 4 channels (RGBA)
+      let index = (y * buffer.width + x) * 4;
+
+      buffer.pixels[index] = 50; // Red
+      buffer.pixels[index + 1] = bright; // Green
+      buffer.pixels[index + 2] = 171; // Blue
+      buffer.pixels[index + 3] = 200; // Alpha
     }
   }
-  noiseOffset += 0.01; // Adjust to control the speed of noise movement
+  buffer.updatePixels();
+
+  // speed up rotation when timer is running
+  angleSpeed = timer.isRunning ? BASE_ANGLE_SPEED * 5 : BASE_ANGLE_SPEED;
+  angleOffset += angleSpeed;
 }
 
 // Button Functions --------------------------------------------------------------------------
@@ -267,7 +292,7 @@ function mouseDragged() {
   if (previousMouseX != null && previousMouseY != null) {
     let dx = mouseX - previousMouseX;
     let dy = mouseY - previousMouseY;
-    let distance = sqrt(dx * dy + dy * dy);
+    let distance = sqrt(dx * dx + dy * dy);
     let currentTime = millis();
     let timeElapsed = currentTime - previousTime;
 
@@ -282,8 +307,10 @@ function mouseDragged() {
     // determine direction - clockwise or counterclockwise
     if (angle < dial.angle) {
       timer.remainingTime += timeAdjustment;
+      //angleSpeed = -BASE_ANGLE_SPEED * 8;
     } else if (angle > dial.angle) {
       timer.remainingTime -= timeAdjustment;
+      //angleSpeed = BASE_ANGLE_SPEED * 8;
     }
 
     timer.remainingTime = constrain(timer.remainingTime, 0, MAX_TIME);
@@ -301,6 +328,7 @@ function mouseDragged() {
 function mouseReleased() {
   if (!mouseDown) return;
   isDialMoving = false;
+  angleSpeed = BASE_ANGLE_SPEED;
 
   //round to nearest 30 seconds
   timer.remainingTime = Math.round(timer.remainingTime / 30000) * 30000;
@@ -318,6 +346,7 @@ function mouseReleased() {
 }
 
 function mousePressed() {
+  checkHover();
   if (
     mouseX > 0 &&
     mouseX < width &&
@@ -339,7 +368,7 @@ function mousePressed() {
     mouseX > 0 &&
     mouseX < width &&
     mouseY > height / 7 + 10 &&
-    mouseY < (6 * height) / 7 &&
+    mouseY < height - 25 &&
     !timer.isRunning &&
     timer.duration == 0;
 
@@ -351,7 +380,11 @@ function mousePressed() {
 
 //mouse hover --------------------------------------------------------------------------------
 function mouseMoved() {
-  //check if hovering over title
+  checkHover();
+}
+
+function checkHover() {
+  //check if hovering over title or dial
   if (
     mouseX > 0 &&
     mouseX < width &&
@@ -366,13 +399,13 @@ function mouseMoved() {
     hoveringOverTitle = false;
   }
 
-  if (dial == null) return; // dial not initialized yet
+  if (dial == null) return;
 
   if (
     mouseX > 0 &&
     mouseX < width &&
     mouseY > height / 7 + 10 &&
-    mouseY < (6 * height) / 7 &&
+    mouseY < height - 25 &&
     !timer.isRunning &&
     timer.duration == 0
   ) {

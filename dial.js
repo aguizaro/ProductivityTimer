@@ -49,7 +49,7 @@ class Dial {
     }
     this.innerDialPG.strokeWeight(5);
     this.innerDialPG.noFill();
-    let numSegments = 120;
+    let numSegments = 60;
     let angleStep = TWO_PI / numSegments;
     for (let i = 0; i < numSegments; i++) {
       if (i % 2 === 0) {
