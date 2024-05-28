@@ -4,6 +4,13 @@
 // Global variables
 const MAX_TIME = 1000 * 60 * 60 * 12; // 12 hours
 
+// Interface
+const InterfaceState = {
+  TIMER: "TIMER",
+  PAUSED: "PAUSED",
+  STOPPED: "STOPPED",
+};
+
 // Timer
 let timer;
 let totalTime;
@@ -32,7 +39,7 @@ let mouseDown = false;
 
 // Particles
 let particles = [];
-let numParticles = 1500;
+let numParticles = 2500;
 let dialX, dialY, dialOuterRadius, dialInnerRadius;
 
 // Perlin Noise
@@ -67,7 +74,7 @@ function setup() {
 
   dialX = width / 2;
   dialY = height / 2 + 25;
-  dialOuterRadius = 225;
+  dialOuterRadius = 250;
   dialInnerRadius = 150;
 
   dial = new Dial(dialX, dialY, dialInnerRadius, dialOuterRadius);
@@ -172,17 +179,25 @@ async function getCurrentSunlight() {
 function draw() {
   resizeCanvas(Math.floor(windowWidth / 100) * 100, 720);
 
-  //update dial
-  dial.x = width / 2;
-  dial.y = height / 2 + 25;
-
   background(255);
 
   //display perlin noise background
   drawNoiseBackground();
   image(buffer, 0, 0, width, height);
 
-  //print all timer props
+  //update and display particles
+  for (let particle of particles) {
+    particle.dialX = dial.x;
+    particle.dialY = dial.y;
+    particle.updatePosition();
+    particle.display(mouseSpeed, timer.isRunning);
+  }
+
+  //update position of dial bassed on current canvas size
+  dial.x = width / 2;
+  dial.y = height / 2 + 25;
+
+  //display dial elements
   if (timer.duration != 0 && !mouseDown) {
     let minuteAngle = map(timer.remainingTime, 0, 60000, 0, TWO_PI);
     let totalAngle = map(timer.remainingTime, 0, totalTime, 0, TWO_PI);
@@ -191,14 +206,8 @@ function draw() {
     dial.display(hoveringOverDial);
   }
 
+  // display timer countdown and timer name
   timer.display(hoveringOverTitle, hoveringOverDial);
-
-  for (let particle of particles) {
-    particle.dialX = dial.x;
-    particle.dialY = dial.y;
-    particle.updatePosition();
-    particle.display(mouseSpeed, timer.isRunning);
-  }
 
   if (hoveringOverDial) {
     if (timerDone) {
@@ -374,11 +383,11 @@ function mouseDragged() {
     let rotationDirection = 0;
     if (angle < dial.angle) {
       timer.remainingTime += timeAdjustment;
-      rotationDirection = 1;
+      rotationDirection = 2;
       //angleSpeed = -BASE_ANGLE_SPEED * 8;
     } else if (angle > dial.angle) {
       timer.remainingTime -= timeAdjustment;
-      rotationDirection = -1;
+      rotationDirection = -2;
       //angleSpeed = BASE_ANGLE_SPEED * 8;
     }
 

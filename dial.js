@@ -66,7 +66,7 @@ class Dial {
 
   updateInnerFill(angle) {
     this.innerFillPG.clear();
-    this.innerFillPG.fill(0, 10, 190, 120);
+    this.innerFillPG.fill(0, 10, 190, 160);
     this.innerFillPG.stroke(0, 0, 255, 200);
     this.innerFillPG.strokeWeight(3);
     this.innerFillPG.arc(
@@ -83,7 +83,7 @@ class Dial {
     this.outerFillPG.clear();
     if (angle === 0) return;
 
-    this.outerFillPG.fill(0, 100, 202, 120);
+    this.outerFillPG.fill(0, 100, 202, 130);
     this.outerFillPG.stroke(255, 255, 255, 200);
     this.outerFillPG.strokeWeight(3);
 

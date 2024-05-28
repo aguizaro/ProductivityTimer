@@ -94,6 +94,7 @@ class Particle {
       speed = 0.3;
     } else {
       this.influenceDirection(0.0025);
+      speed = 0.1;
     }
     this.update(speed / 2); // mouse speed incerases the speed of the particles
 
