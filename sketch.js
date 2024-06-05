@@ -4,18 +4,31 @@
 // Global variables
 const MAX_TIME = 1000 * 60 * 60 * 12; // 12 hours
 
-// Interface
+// scrolling
+let scrollOffset = 0;
+const scrollYStart = 250;
+const scrollYDiff = 105;
+const widthPadding = 40;
+let maxScrollOffset;
+
+// Interface State - these are mutually exclusive
 const InterfaceState = {
-  TIMER: "TIMER",
-  PAUSED: "PAUSED",
-  STOPPED: "STOPPED",
+  TIMER: true,
+  TASKS: false,
 };
+
+// Canvas
+let canvas;
+const MAX_CANVAS_WIDTH = 1000;
+const MIN_CANVAS_WIDTH = 500;
+const MAX_DIAL_RADIUS = 250;
+const MAX_NUM_PARTICLES = 3000;
 
 // Timer
 let timer;
-let totalTime;
 let hoveringOverTitle = false;
-let timerDone = false;
+let timerHistory = [];
+let timerDigitSize;
 
 // Dial
 let dial;
@@ -27,6 +40,13 @@ let pauseButton;
 let startButton;
 let resetButton;
 let nameInput;
+let switchViewButton;
+let pauseColor,
+  resumeColor,
+  resetColor,
+  startColor,
+  completeColor,
+  switchViewColor;
 
 // Fonts
 let digitalFont;
@@ -39,18 +59,16 @@ let mouseDown = false;
 
 // Particles
 let particles = [];
-let numParticles = 2500;
+let numParticles;
 let dialX, dialY, dialOuterRadius, dialInnerRadius;
 
 // Perlin Noise
 let buffer;
-let noiseScale = 0.1; //density of noise
+let noiseScale = 0.1;
 let noiseOffset = 0;
 let angleOffset = 0;
 const BASE_ANGLE_SPEED = 0.0003; // speed of noise rotation
 let angleSpeed = BASE_ANGLE_SPEED;
-//Button colors
-let pauseColor, resumeColor, resetColor, startColor;
 
 // preload --------------------------------------------------------------------------------------
 function preload() {
@@ -62,41 +80,64 @@ function preload() {
 
 function setup() {
   frameRate(60);
-  canvasWidth = Math.floor(windowWidth / 100) * 100;
-  createCanvas(canvasWidth, 720);
-  buffer = createGraphics(width / 4, height / 4); // Create a smaller off-screen buffer
-  buffer.pixelDensity(1); // Ensure the pixel density of the buffer is set to 1 for accurate scaling
+
+  // scale dimensions based on window width ----------
+
+  let = canvasWidth = min(
+    Math.floor(windowWidth / 100) * 100,
+    MAX_CANVAS_WIDTH
+  );
+  canvas = createCanvas(canvasWidth, 700);
+  buffer = createGraphics(width / 4, height / 4); // create a smaller off-screen buffer
+  buffer.pixelDensity(1); // set to 1 for accurate scaling
 
   pauseColor = color(17, 142, 214);
   resumeColor = color(0, 120, 120);
   resetColor = color(69, 0, 219);
   startColor = color(34, 128, 242);
+  completeColor = color(0, 150, 0);
+  switchViewColor = color(255, 0, 0);
 
   dialX = width / 2;
   dialY = height / 2 + 25;
-  dialOuterRadius = 250;
-  dialInnerRadius = 150;
+  dialOuterRadius = min(width / 2 - 10, MAX_DIAL_RADIUS);
+  dialInnerRadius = dialOuterRadius / 1.6;
+  numParticles = min(dialOuterRadius * 10, MAX_NUM_PARTICLES);
+  timerDigitSize = dialInnerRadius / 2;
 
   dial = new Dial(dialX, dialY, dialInnerRadius, dialOuterRadius);
 
   // load local storage data -----------------------
 
-  const data = localStorage.getItem("currentTimer");
-  const totalTimeValue = parseInt(localStorage.getItem("totalTime"));
+  const currentTimerSavedData = localStorage.getItem("currentTimer");
+  const currentViewData = localStorage.getItem("currentView");
+  const timerHistoryData = localStorage.getItem("timerHistory");
 
   timer = new Timer();
-  timer.name = "Untitled Timer";
+  timer.name = "Untitled Task";
 
   // set local storage data -------------------------
 
-  if (data) {
-    // load saved timer
-    const timerData = JSON.parse(data);
+  if (currentTimerSavedData) {
+    const timerData = JSON.parse(currentTimerSavedData);
     timer.loadTimer(timerData);
   }
-  if (totalTimeValue) {
-    totalTime = totalTimeValue;
+  if (timerHistoryData) {
+    timerHistory = JSON.parse(timerHistoryData).map((t) => {
+      const newTimer = new Timer();
+      newTimer.loadTimer(t);
+      return newTimer;
+    });
   }
+  if (currentViewData == "tasks") {
+    InterfaceState.TIMER = false;
+    InterfaceState.TASKS = true;
+  } else {
+    InterfaceState.TIMER = true;
+    InterfaceState.TASKS = false;
+  }
+
+  maxScrollOffset = timerHistory.length * scrollYDiff - height + scrollYStart; // 80 is the spacing between tasks, 250 is initial y-offset
 
   // create particles ---------------------
   for (let i = 0; i < numParticles; i++) {
@@ -112,14 +153,21 @@ function setup() {
   //create buttons ---------------------------------
   const buttonDiv = createDiv();
   buttonDiv.class("buttonDiv");
+  switchViewButton = createButton("View");
+  styleButton(switchViewButton, switchViewColor);
+  switchViewButton.mousePressed(toggleView);
   if (timer.isRunning) {
     pauseButton = createButton("Pause");
     pauseButton.mousePressed(pauseTimer);
     styleButton(pauseButton, pauseColor);
-  } else {
+  } else if (timer.remainingTime > 0) {
     pauseButton = createButton("Resume");
     pauseButton.mousePressed(resumeTimer);
     styleButton(pauseButton, resumeColor);
+  } else {
+    pauseButton = createButton("Pause");
+    pauseButton.mousePressed(pauseTimer);
+    styleButton(pauseButton, pauseColor, true);
   }
   if (timer.remainingTime === 0) {
     styleButton(pauseButton, pauseColor, true);
@@ -137,53 +185,109 @@ function setup() {
     styleButton(pauseButton, pauseColor, true);
     styleButton(startButton, startColor);
   }
+  buttonDiv.child(switchViewButton);
   buttonDiv.child(pauseButton);
   buttonDiv.child(resetButton);
   buttonDiv.child(startButton);
 
-  getCurrentSunlight().then((color) => {
-    console.log(color);
+  // create modal
+  setupModal();
+
+  // mouse exits canvas
+  canvas.mouseOut(() => {
+    if (mouseDown) return;
+
+    hoveringOverDial = false;
+    hoveringOverTitle = false;
   });
 }
 
 // user properties --------------------------------------------------------------------------------
 
-async function getCurrentSunlight() {
-  let lat, lon, sunrise, sunset;
-  if (navigator.geolocation) {
-    navigator.geolocation.getCurrentPosition((position) => {
-      lat = position.coords.latitude;
-      lon = position.coords.longitude;
-    });
-  } else {
-    console.log("Geolocation is not supported by this browser.");
-  }
+// async function getCurrentSunlight() {
+//   let lat, lon, sunrise, sunset;
+//   if (navigator.geolocation) {
+//     navigator.geolocation.getCurrentPosition((position) => {
+//       lat = position.coords.latitude;
+//       lon = position.coords.longitude;
+//     });
+//   } else {
+//     console.log("Geolocation is not supported by this browser.");
+//   }
 
-  let url = `https://api.sunrise-sunset.org/json?lat=${lat}&lng=${lon}&formatted=0`;
+//   let url = `https://api.sunrise-sunset.org/json?lat=${lat}&lng=${lon}&formatted=0`;
 
-  const data = await fetch(url);
-  const json = await data.json();
-  sunrise = new Date(json.results.sunrise);
-  sunset = new Date(json.results.sunset);
+//   const data = await fetch(url);
+//   const json = await data.json();
+//   sunrise = new Date(json.results.sunrise);
+//   sunset = new Date(json.results.sunset);
 
-  let now = new Date();
-  let currentTime = now.getTime();
-  let sunriseTime = sunrise.getTime();
-  let sunsetTime = sunset.getTime();
+//   let now = new Date();
+//   let currentTime = now.getTime();
+//   let sunriseTime = sunrise.getTime();
+//   let sunsetTime = sunset.getTime();
 
-  return `Sunrise: ${sunriseTime}, Sunset: ${sunsetTime}, Current: ${currentTime}`;
-}
+//   return `Sunrise: ${sunriseTime}, Sunset: ${sunsetTime}, Current: ${currentTime}`;
+// }
 
 // update loop --------------------------------------------------------------------------------
 
 function draw() {
-  resizeCanvas(Math.floor(windowWidth / 100) * 100, 720);
-
   background(255);
+
+  if (timerHistory.length < 5) {
+    // reset scroll offset if there are less than 5 tasks
+    scrollOffset = 0;
+  } else {
+    scrollOffset = constrain(scrollOffset, -maxScrollOffset, 0);
+  }
+  maxScrollOffset = timerHistory.length * scrollYDiff - height + scrollYStart;
+  MAX_DESCRIPTION_LENGTH = width / 10;
 
   //display perlin noise background
   drawNoiseBackground();
   image(buffer, 0, 0, width, height);
+
+  // display task view if active
+  if (InterfaceState.TASKS) {
+    textFont(titleFont, 48);
+    fill(189, 255, 242);
+    textAlign(CENTER, CENTER);
+    text("Task View", width / 2, widthPadding);
+
+    if (timerHistory.length === 0 && timer.startTime === 0) {
+      textFont(titleFont, 24);
+      fill(189, 255, 242);
+      textAlign(CENTER, CENTER);
+      text("No tasks completed yet", width / 2, height / 2);
+    }
+    // display task history
+    timerHistory
+      .slice()
+      .reverse()
+      .forEach((t, i) => {
+        const yPos = scrollYStart + i * scrollYDiff + scrollOffset;
+        if (yPos > height || yPos < scrollYStart - 60) {
+          return;
+        }
+        t.displayAsHistoryTask(
+          40,
+          scrollYStart + i * scrollYDiff + scrollOffset
+        );
+      });
+
+    // display current task
+    timer.update();
+    timer.displayAsCurrentTask(widthPadding, 100);
+
+    //display horizontal line
+    push();
+    stroke(255);
+    strokeWeight(1);
+    line(widthPadding, 100 + 130, width - widthPadding, 100 + 130);
+    pop();
+    return; // exit draw loop
+  }
 
   //update and display particles
   for (let particle of particles) {
@@ -193,14 +297,16 @@ function draw() {
     particle.display(mouseSpeed, timer.isRunning);
   }
 
-  //update position of dial bassed on current canvas size
-  dial.x = width / 2;
-  dial.y = height / 2 + 25;
-
   //display dial elements
-  if (timer.duration != 0 && !mouseDown) {
+  if (timer.totalDuration != 0 && !mouseDown) {
     let minuteAngle = map(timer.remainingTime, 0, 60000, 0, TWO_PI);
-    let totalAngle = map(timer.remainingTime, 0, totalTime, 0, TWO_PI);
+    let totalAngle = map(
+      timer.remainingTime,
+      0,
+      timer.totalDuration,
+      0,
+      TWO_PI
+    );
     dial.display(hoveringOverDial, minuteAngle, totalAngle);
   } else {
     dial.display(hoveringOverDial);
@@ -209,8 +315,9 @@ function draw() {
   // display timer countdown and timer name
   timer.display(hoveringOverTitle, hoveringOverDial);
 
+  // display user instructions on hover
   if (hoveringOverDial) {
-    if (timerDone) {
+    if (timer.remainingTime == 0) {
       push();
       fill(189, 255, 242, 255);
       textAlign(CENTER, CENTER);
@@ -222,7 +329,7 @@ function draw() {
         dial.y + dial.outerRadius + 30
       );
       pop();
-    } else if (!isDialMoving) {
+    } else if (!isDialMoving && timer.totalDuration == 0) {
       push();
       fill(189, 255, 242, 255);
       textAlign(CENTER, CENTER);
@@ -236,7 +343,6 @@ function draw() {
       pop();
     }
   }
-
   if (hoveringOverTitle) {
     push();
     fill(189, 255, 242, 255);
@@ -261,7 +367,8 @@ function drawNoiseBackground() {
       // noise value based on the angle and radius
       let noiseValue = noise(
         cos(angle) * radius * noiseScale,
-        sin(angle) * radius * noiseScale
+        sin(angle) * radius * noiseScale,
+        noiseOffset
       );
       let bright = map(noiseValue, 0, 1, 0, 255);
 
@@ -277,8 +384,12 @@ function drawNoiseBackground() {
   buffer.updatePixels();
 
   // speed up rotation when timer is running
-  angleSpeed = timer.isRunning ? BASE_ANGLE_SPEED * 4 : BASE_ANGLE_SPEED;
+  angleSpeed =
+    timer.isRunning && InterfaceState.TIMER
+      ? BASE_ANGLE_SPEED * 4
+      : -BASE_ANGLE_SPEED;
   angleOffset += angleSpeed;
+  noiseOffset += 0.01;
 }
 
 // Button Functions --------------------------------------------------------------------------
@@ -298,24 +409,42 @@ function resumeTimer() {
 }
 
 function resetTimer() {
+  // add timer to history
+  timer.timeExpired = true;
+  if (timer.startTime != 0) timerHistory.push(timer.cloneTimer());
+
+  // reset timer
   timer.resetTimer();
-  totalTime = 0;
-  timerDone = false;
+
+  // reset buttons
   styleButton(pauseButton, pauseColor, true);
+  startButton.html("Start");
+  startButton.mousePressed(startTimer);
   styleButton(startButton, startColor, true);
+  styleButton(resetButton, resetColor, true);
+
+  // update data
+  localStorage.setItem("timerHistory", JSON.stringify(timerHistory));
   localStorage.removeItem("currentTimer");
-  localStorage.removeItem("totalTime");
 }
 
 function startTimer() {
+  // start timer
   timer.startTimer(timer.remainingTime / 1000, timer.name);
-  totalTime = timer.remainingTime;
-  styleButton(startButton, startColor, true);
+
+  // update buttons
+  startButton.html("Complete Task");
+  startButton.mousePressed(completeTask);
+  styleButton(startButton, completeColor);
 
   pauseButton.html("Pause");
   pauseButton.mousePressed(pauseTimer);
   styleButton(pauseButton, pauseColor);
-  localStorage.setItem("totalTime", totalTime);
+}
+
+function completeTask() {
+  timer.taskComplete = true;
+  resetTimer(); // timer is saved to tasks and then reset
 }
 
 function styleButton(btn, col, disabled = false) {
@@ -357,6 +486,19 @@ function decreaseAlpha(col, amount) {
   return color(r, g, b, a);
 }
 
+function toggleView() {
+  InterfaceState.TIMER = !InterfaceState.TIMER;
+  InterfaceState.TASKS = !InterfaceState.TASKS;
+  localStorage.setItem("currentView", InterfaceState.TIMER ? "timer" : "tasks");
+}
+
+// Utility Functions --------------------------------------------------------------------------
+
+// string cannot be empty or contain only whitespace
+function isValidString(str) {
+  return !(str.trim().length === 0);
+}
+
 // mouse interaction -------------------------------------------------------------------------
 function mouseDragged() {
   if (!mouseDown) return;
@@ -383,17 +525,16 @@ function mouseDragged() {
     let rotationDirection = 0;
     if (angle < dial.angle) {
       timer.remainingTime += timeAdjustment;
-      rotationDirection = 2;
-      //angleSpeed = -BASE_ANGLE_SPEED * 8;
+      rotationDirection = 5 * mouseSpeed;
     } else if (angle > dial.angle) {
       timer.remainingTime -= timeAdjustment;
-      rotationDirection = -2;
-      //angleSpeed = BASE_ANGLE_SPEED * 8;
+      rotationDirection = -5 * mouseSpeed;
     }
 
     timer.remainingTime = constrain(timer.remainingTime, 0, MAX_TIME);
     if (timer.remainingTime > 0) {
       styleButton(startButton, startColor);
+      styleButton(resetButton, resetColor);
     }
 
     if (rotationDirection != 0) {
@@ -410,6 +551,9 @@ function mouseDragged() {
 
 function mouseReleased() {
   if (!mouseDown) return;
+
+  checkHover();
+
   isDialMoving = false;
   angleSpeed = BASE_ANGLE_SPEED;
 
@@ -429,6 +573,14 @@ function mouseReleased() {
 }
 
 function mousePressed() {
+  if (isModalOpen()) {
+    return;
+  }
+
+  timerHistory.forEach((t, i) => {
+    t.removeTaskButton.checkPressed();
+  });
+
   checkHover();
   if (
     mouseX > 0 &&
@@ -437,12 +589,7 @@ function mousePressed() {
     mouseY < height / 7 + 10 &&
     timer.startTime == 0
   ) {
-    const inputName = prompt("Enter timer name", timer.name);
-    if (inputName != null && inputName != "") {
-      timer.name = inputName;
-    } else {
-      timer.name = "Untitled Timer";
-    }
+    openModal();
     localStorage.setItem("currentTimer", JSON.stringify(timer));
     return;
   }
@@ -473,6 +620,8 @@ function mouseMoved() {
 }
 
 function checkHover() {
+  if (!timer || timer.remainingTime == 0 || timer.isPaused || isModalOpen())
+    return false;
   //check if hovering over title or dial
   if (
     mouseX > 0 &&
@@ -503,7 +652,15 @@ function checkHover() {
   }
 }
 
-//window focus --------------------------------------------------------------------------------
+// mouse scroll --------------------------------------------------------------------------------
+
+function mouseWheel(event) {
+  if (!InterfaceState.TASKS) return;
+  scrollOffset += event.delta;
+  return false;
+}
+
+//window functions --------------------------------------------------------------------------------
 window.onfocus = function () {
   mouseDown = false;
   hoveringOverDial = false;
@@ -514,3 +671,58 @@ window.onblur = function () {
   hoveringOverDial = false;
   hoveringOverTitle = false;
 };
+
+function windowResized() {
+  let = canvasWidth = max(
+    min(Math.floor(windowWidth / 100) * 100, MAX_CANVAS_WIDTH),
+    MIN_CANVAS_WIDTH
+  );
+
+  resizeCanvas(canvasWidth, 700);
+
+  // recreate buffer with new dimensions
+  buffer.clear();
+  buffer = createGraphics(width / 4, height / 4);
+  buffer.pixelDensity(1);
+
+  // update size properties
+  dialX = width / 2;
+  dialY = height / 2 + 25;
+  dialOuterRadius = min(width / 2 - 10, MAX_DIAL_RADIUS);
+  dialInnerRadius = dialOuterRadius / 1.6;
+  numParticles = min(dialOuterRadius * 10, MAX_NUM_PARTICLES);
+  timerDigitSize = dialInnerRadius / 2;
+
+  dial.x = dialX;
+  dial.y = dialY;
+
+  //recreate particles
+  particles = [];
+  for (let i = 0; i < numParticles; i++) {
+    let angle = random(TWO_PI);
+    let radius = random(dialInnerRadius, dialOuterRadius);
+    let x = dialX + radius * cos(angle);
+    let y = dialY + radius * sin(angle);
+    particles.push(
+      new Particle(x, y, dialX, dialY, dialInnerRadius, dialOuterRadius)
+    );
+  }
+}
+
+// Keyboard events --------------------------------------------------------------------------
+
+function keyPressed() {
+  if (keyCode === ENTER && !isModalOpen()) {
+    toggleView();
+    return false;
+  }
+
+  if (keyCode === ESCAPE && isModalOpen()) {
+    closeModal();
+  }
+
+  if (keyCode === ENTER && isModalOpen()) {
+    applyModalData(timer);
+    return false;
+  }
+}
