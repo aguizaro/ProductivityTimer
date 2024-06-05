@@ -11,6 +11,11 @@ const scrollYDiff = 105;
 const widthPadding = 40;
 let maxScrollOffset;
 
+// sfx
+let tickSFX;
+let alarmSFX;
+let clickSFX;
+
 // Interface State - these are mutually exclusive
 const InterfaceState = {
   TIMER: true,
@@ -20,7 +25,7 @@ const InterfaceState = {
 // Canvas
 let canvas;
 const MAX_CANVAS_WIDTH = 1000;
-const MIN_CANVAS_WIDTH = 500;
+const MIN_CANVAS_WIDTH = 700;
 const MAX_DIAL_RADIUS = 250;
 const MAX_NUM_PARTICLES = 3000;
 
@@ -41,12 +46,14 @@ let startButton;
 let resetButton;
 let nameInput;
 let switchViewButton;
+let muteButton;
 let pauseColor,
   resumeColor,
   resetColor,
   startColor,
   completeColor,
-  switchViewColor;
+  switchViewColor,
+  muteColor;
 
 // Fonts
 let digitalFont;
@@ -74,11 +81,16 @@ let angleSpeed = BASE_ANGLE_SPEED;
 function preload() {
   digitalFont = loadFont(`./digital-7-mono.ttf`);
   titleFont = loadFont(`./Oldtimer.ttf`);
+
+  tickSFX = loadSound(`./tick.mp3`);
+  alarmSFX = loadSound(`./alarm.mp3`);
+  clickSFX = loadSound(`./click.mp3`);
 }
 
 // setup ---------------------------------------------------------------------------------------
 
 function setup() {
+  getAudioContext().suspend();
   frameRate(60);
 
   // scale dimensions based on window width ----------
@@ -97,6 +109,7 @@ function setup() {
   startColor = color(34, 128, 242);
   completeColor = color(0, 150, 0);
   switchViewColor = color(255, 0, 0);
+  muteColor = color(224, 166, 2);
 
   dialX = width / 2;
   dialY = height / 2 + 25;
@@ -153,6 +166,11 @@ function setup() {
   //create buttons ---------------------------------
   const buttonDiv = createDiv();
   buttonDiv.class("buttonDiv");
+
+  muteButton = createButton("Mute");
+  muteButton.mousePressed(toggleMute);
+  styleButton(muteButton, muteColor);
+
   switchViewButton = createButton("View");
   styleButton(switchViewButton, switchViewColor);
   switchViewButton.mousePressed(toggleView);
@@ -185,6 +203,7 @@ function setup() {
     styleButton(pauseButton, pauseColor, true);
     styleButton(startButton, startColor);
   }
+  buttonDiv.child(muteButton);
   buttonDiv.child(switchViewButton);
   buttonDiv.child(pauseButton);
   buttonDiv.child(resetButton);
@@ -394,7 +413,24 @@ function drawNoiseBackground() {
 
 // Button Functions --------------------------------------------------------------------------
 
+function toggleMute() {
+  clickSFX.play();
+
+  if (muteButton.html() === "Mute") {
+    muteButton.html("Unmute");
+    tickSFX.setVolume(0);
+    alarmSFX.setVolume(0);
+    clickSFX.setVolume(0);
+  } else {
+    muteButton.html("Mute");
+    tickSFX.setVolume(1);
+    alarmSFX.setVolume(1);
+    clickSFX.setVolume(1);
+  }
+}
+
 function pauseTimer() {
+  clickSFX.play();
   timer.pauseTimer();
   pauseButton.html("Resume");
   pauseButton.mousePressed(resumeTimer);
@@ -402,6 +438,7 @@ function pauseTimer() {
 }
 
 function resumeTimer() {
+  clickSFX.play();
   timer.resumeTimer();
   pauseButton.html("Pause");
   pauseButton.mousePressed(pauseTimer);
@@ -409,6 +446,7 @@ function resumeTimer() {
 }
 
 function resetTimer() {
+  clickSFX.play();
   // add timer to history
   timer.timeExpired = true;
   if (timer.startTime != 0) timerHistory.push(timer.cloneTimer());
@@ -429,6 +467,7 @@ function resetTimer() {
 }
 
 function startTimer() {
+  clickSFX.play();
   // start timer
   timer.startTimer(timer.remainingTime / 1000, timer.name);
 
@@ -443,6 +482,7 @@ function startTimer() {
 }
 
 function completeTask() {
+  clickSFX.play();
   timer.taskComplete = true;
   resetTimer(); // timer is saved to tasks and then reset
 }
@@ -487,6 +527,7 @@ function decreaseAlpha(col, amount) {
 }
 
 function toggleView() {
+  clickSFX.play();
   InterfaceState.TIMER = !InterfaceState.TIMER;
   InterfaceState.TASKS = !InterfaceState.TASKS;
   localStorage.setItem("currentView", InterfaceState.TIMER ? "timer" : "tasks");
@@ -525,9 +566,11 @@ function mouseDragged() {
     let rotationDirection = 0;
     if (angle < dial.angle) {
       timer.remainingTime += timeAdjustment;
+      tickSFX.play();
       rotationDirection = 5 * mouseSpeed;
     } else if (angle > dial.angle) {
       timer.remainingTime -= timeAdjustment;
+      tickSFX.play();
       rotationDirection = -5 * mouseSpeed;
     }
 
@@ -573,6 +616,12 @@ function mouseReleased() {
 }
 
 function mousePressed() {
+  userStartAudio();
+
+  if (alarmSFX.isPlaying()) {
+    alarmSFX.stop();
+  }
+
   if (isModalOpen()) {
     return;
   }
@@ -582,6 +631,8 @@ function mousePressed() {
   });
 
   checkHover();
+
+  // if pressed on title, open modal
   if (
     mouseX > 0 &&
     mouseX < width &&
@@ -712,6 +763,7 @@ function windowResized() {
 // Keyboard events --------------------------------------------------------------------------
 
 function keyPressed() {
+  userStartAudio();
   if (keyCode === ENTER && !isModalOpen()) {
     toggleView();
     return false;
@@ -719,9 +771,11 @@ function keyPressed() {
 
   if (keyCode === ESCAPE && isModalOpen()) {
     closeModal();
+    // dont return false here - we want to allow default behavior
   }
 
   if (keyCode === ENTER && isModalOpen()) {
+    clickSFX.play();
     applyModalData(timer);
     return false;
   }

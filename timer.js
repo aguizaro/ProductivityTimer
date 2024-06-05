@@ -19,6 +19,7 @@ class Timer {
     // override the checkPressed function for the button
     this.removeTaskButton.checkPressed = () => {
       if (this.removeTaskButton.isHovered) {
+        clickSFX.play();
         timerHistory.splice(timerHistory.indexOf(this), 1);
         localStorage.setItem("timerHistory", JSON.stringify(timerHistory));
       }
@@ -102,6 +103,8 @@ class Timer {
       localStorage.setItem("currentTimer", JSON.stringify(this));
       if (this.remainingTime <= 0) {
         this.stopTimer();
+        // loop sound
+        alarmSFX.loop();
       }
     }
   }

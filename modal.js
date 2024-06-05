@@ -73,11 +73,14 @@ function setupModal() {
 
   // form submission
   submitBtn.mousePressed(() => {
+    clickSFX.play();
     applyModalData(timer);
   });
 }
 
 function openModal() {
+  console.log("open modal");
+  clickSFX.play();
   taskNameInput.attribute("placeholder", timer.name);
   taskDescInput.attribute(
     "placeholder",
@@ -90,6 +93,8 @@ function openModal() {
 }
 
 function closeModal() {
+  clickSFX.play();
+  console.log("close modal");
   modal.style("display", "none");
 }
 
