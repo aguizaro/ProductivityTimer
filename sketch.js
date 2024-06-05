@@ -619,6 +619,7 @@ function mousePressed() {
   userStartAudio();
 
   if (alarmSFX.isPlaying()) {
+    clickSFX.play();
     alarmSFX.stop();
   }
 
@@ -671,7 +672,7 @@ function mouseMoved() {
 }
 
 function checkHover() {
-  if (!timer || timer.remainingTime == 0 || timer.isPaused || isModalOpen())
+  if (!timer || timer.timeExpired || timer.isPaused || isModalOpen())
     return false;
   //check if hovering over title or dial
   if (
@@ -775,7 +776,6 @@ function keyPressed() {
   }
 
   if (keyCode === ENTER && isModalOpen()) {
-    clickSFX.play();
     applyModalData(timer);
     return false;
   }

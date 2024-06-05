@@ -119,6 +119,9 @@ class Timer {
     if (timer.timeExpired) {
       fill(189, 255, 242, 120);
     }
+    if (alarmSFX.isPlaying()) {
+      fill(255, 0, 0, 150);
+    }
     textAlign(CENTER, CENTER);
     text(this.name, width / 2, height / 11);
 
@@ -130,6 +133,9 @@ class Timer {
     }
     if (timer.timeExpired) {
       fill(189, 255, 242, 120);
+    }
+    if (alarmSFX.isPlaying()) {
+      fill(255, 0, 0, 150);
     }
 
     textAlign(CENTER, CENTER);
